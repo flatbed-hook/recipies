@@ -1,13 +1,17 @@
 ---
 description: Convert a recipe (text, image file, or URL) into a standard page and publish it to the recipes site
 argument-hint: [recipe text, image file path, or URL]
-allowed-tools: Bash(git:*), Bash(mkdir:*), Bash(cp:*), Bash(ls:*), Read, Write, Edit, WebFetch
+allowed-tools: Bash(git:*), Bash(mkdir:*), Bash(cp:*), Bash(ls:*), Bash(curl:*), Bash(grep:*), Read, Write, Edit, WebFetch
 ---
 
 You are adding a recipe to this GitHub Pages site. The input is: $ARGUMENTS
 
 ## Step 1: Get the recipe content
 - If the input is a URL, use WebFetch to read the page. If it's a justtherecipe.com URL, skip it and fetch its `?url=` target directly instead — the proxy returns no content. Extract the full recipe: title, description, servings, times, ingredients, instructions, and notes. Record the site name and URL as the source only if they are clearly identified. If the source is unclear or missing, omit the source line entirely.
+- If it's a `pin.it` or `pinterest.*` URL, WebFetch can't see the recipe or the outbound link (Pinterest is JS-rendered). Instead run:
+  `curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" "<pin.it URL>" -o /dev/null -w "%{url_effective}\n"` to resolve the short link to a `pinterest.com/pin/<id>/` URL, then
+  `curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36" "https://www.pinterest.com/pin/<id>/" | grep -o '"link":"[^"]*"' | grep -v '""' | sort -u`
+  to pull the real source URL out of the page's embedded JSON, then WebFetch that URL for the actual recipe. If the resolved URL is a Pinterest error page (`show_error=true`) or the grep comes back empty, the pin is dead — stop and tell the user.
 - If the input is an image file path, read the image and transcribe the full recipe. Use the image as the recipe photo only if it is a photo of the finished dish. Do not use a photo of the recipe card itself.
 - If the input is text, use it as written. Clean up formatting, but keep all content.
 - If the image was pasted into chat and has no file path, stop and ask the user to save it to a file and provide the path. Otherwise, transcribe the recipe and omit the photo.
