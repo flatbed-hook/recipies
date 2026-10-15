@@ -22,6 +22,7 @@ You are adding a recipe to this GitHub Pages site. The input is: $ARGUMENTS
 - Category must be one of: Baking, Soups, Salads, Vegetarian, Other. Pick the best fit.
 - Write `recipes/<slug>.html` using the TEMPLATE below. Replace every {{PLACEHOLDER}}. Delete any block marked OPTIONAL when its content is not available. Do not change the structure, class names, or order of sections, because every page must match.
 - If there is a photo, copy it to `images/<slug>.<original-extension>` and use that filename in the template. Otherwise, delete the image line.
+- If the recipe has any notes, tips, variations, or storage instructions, include them in the Notes section — don't drop them.
 
 ## Step 3: Add to the index
 - In `index.html`, insert a new line directly after `<!-- RECIPES:START -->` using this format:
