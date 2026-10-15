@@ -7,7 +7,7 @@ allowed-tools: Bash(git:*), Bash(mkdir:*), Bash(cp:*), Bash(ls:*), Read, Write, 
 You are adding a recipe to this GitHub Pages site. The input is: $ARGUMENTS
 
 ## Step 1: Get the recipe content
-- If the input is a URL, use WebFetch to read the page. Extract the full recipe: title, description, servings, times, ingredients, instructions, and notes. Record the site name and URL as the source only if they are clearly identified. If the source is unclear or missing, omit the source line entirely.
+- If the input is a URL, use WebFetch to read the page. If it's a justtherecipe.com URL, skip it and fetch its `?url=` target directly instead — the proxy returns no content. Extract the full recipe: title, description, servings, times, ingredients, instructions, and notes. Record the site name and URL as the source only if they are clearly identified. If the source is unclear or missing, omit the source line entirely.
 - If the input is an image file path, read the image and transcribe the full recipe. Use the image as the recipe photo only if it is a photo of the finished dish. Do not use a photo of the recipe card itself.
 - If the input is text, use it as written. Clean up formatting, but keep all content.
 - If the image was pasted into chat and has no file path, stop and ask the user to save it to a file and provide the path. Otherwise, transcribe the recipe and omit the photo.
