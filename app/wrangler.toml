@@ -1,0 +1,10 @@
+name = "recipies"
+compatibility_date = "2026-10-19"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "recipes"
+# The deploy serves 500s until this is a real id from `wrangler d1 create recipes`.
+# Any value works for local dev and tests.
+database_id = "REPLACE_WITH_DATABASE_ID"

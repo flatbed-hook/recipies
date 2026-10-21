@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS recipes (slug TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at TEXT);

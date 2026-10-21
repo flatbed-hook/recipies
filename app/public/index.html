@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recipes</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header"><a href="/">Recipes</a></header>
+<main>
+<h1>Recipes</h1>
+<ul class="recipe-list" id="recipe-list"></ul>
+</main>
+<script>
+fetch('/api/recipes').then((r) => r.json()).then((recipes) => {
+  document.getElementById('recipe-list').append(...recipes.map((recipe) => {
+    const a = document.createElement('a');
+    a.href = '/recipes/' + encodeURIComponent(recipe.slug);
+    a.textContent = recipe.title;
+    const li = document.createElement('li');
+    li.append(a);
+    return li;
+  }));
+});
+</script>
+</body>
+</html>
