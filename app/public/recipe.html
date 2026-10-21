@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recipes</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="site-header"><a href="/">← All Recipes</a></header>
+<main id="recipe"></main>
+<script>
+const main = document.getElementById('recipe');
+const el = (tag, text, cls) => {
+  const node = document.createElement(tag);
+  if (text) node.textContent = text;
+  if (cls) node.className = cls;
+  return node;
+};
+const list = (tag, items, cls) => {
+  const node = el(tag, '', cls);
+  node.append(...items.map((item) => el('li', item)));
+  return node;
+};
+
+const slug = decodeURIComponent(location.pathname.replace(/^\/recipes\//, '').replace(/\/$/, ''));
+
+fetch('/api/recipes/' + encodeURIComponent(slug)).then(async (response) => {
+  if (!response.ok) {
+    document.title = 'Not found | Recipes';
+    main.append(el('h1', 'Recipe not found'), el('p', 'No recipe is stored under “' + slug + '”.'));
+    return;
+  }
+  const recipe = await response.json();
+
+  document.title = recipe.title + ' | Recipes';
+  main.append(el('h1', recipe.title));
+  if (recipe.description) main.append(el('p', recipe.description, 'description'));
+  if (recipe.image) {
+    const img = el('img', '', 'recipe-image');
+    img.src = recipe.image;
+    img.alt = recipe.title;
+    main.append(img);
+  }
+
+  const meta = [
+    ['Tags', (recipe.tags || []).join(', ')],
+    ['Servings', recipe.servings],
+    ['Prep time', recipe.prepTime],
+    ['Cook time', recipe.cookTime],
+  ].filter(([, value]) => value);
+  if (meta.length) {
+    const ul = el('ul', '', 'meta');
+    ul.append(...meta.map(([label, value]) => {
+      const li = el('li');
+      li.append(el('strong', label + ':'), ' ' + value);
+      return li;
+    }));
+    main.append(ul);
+  }
+
+  if (recipe.ingredients && recipe.ingredients.length) main.append(el('h2', 'Ingredients'), list('ul', recipe.ingredients, 'ingredients'));
+  if (recipe.steps && recipe.steps.length) main.append(el('h2', 'Instructions'), list('ol', recipe.steps, 'steps'));
+  if (recipe.notes) main.append(el('h2', 'Notes'), el('p', recipe.notes));
+  if (recipe.source && recipe.source.url) {
+    const link = el('a', recipe.source.name || recipe.source.url);
+    link.href = recipe.source.url;
+    const footer = el('footer', 'Source: ', 'source');
+    footer.append(link);
+    main.append(footer);
+  }
+});
+</script>
+</body>
+</html>
