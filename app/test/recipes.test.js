@@ -9,16 +9,42 @@ beforeAll(async () => {
   await env.DB.exec(seed.trim());
 });
 
-it('GET /api/recipes returns the seeded recipe', async () => {
-  const response = await onRequestGet({ request: new Request('http://test/api/recipes'), env });
+const get = async () => (await onRequestGet({ request: new Request('http://test/api/recipes'), env })).json();
 
-  expect(response.status).toBe(200);
-  const recipes = await response.json();
-  expect(recipes).toHaveLength(1);
-  expect(recipes[0].slug).toBe('tabbouleh');
-  expect(recipes[0].title).toBe('Tabbouleh');
-  expect(recipes[0].tags).toEqual(['Salads']);
-  expect(recipes[0].ingredients).toContain('3 tbsp fresh lemon juice');
-  expect(recipes[0].steps).toHaveLength(3);
-  expect(recipes[0].source.url).toBe('https://www.loveandlemons.com/tabbouleh/');
+it('GET /api/recipes returns all 16 migrated recipes, each complete', async () => {
+  const recipes = await get();
+
+  expect(recipes).toHaveLength(16);
+  for (const r of recipes) {
+    expect(r.slug).toMatch(/^[a-z0-9-]+$/);
+    expect(r.title).toBeTruthy();
+    expect(r.tags[0]).toBeTruthy();
+    expect(r.ingredients.length).toBeGreaterThan(0);
+    expect(r.steps.length).toBeGreaterThan(0);
+    expect(Object.keys(r).sort()).toEqual(
+      ['cookTime', 'description', 'image', 'ingredients', 'notes', 'prepTime', 'servings', 'slug', 'source', 'steps', 'tags', 'title', 'updatedAt'],
+    );
+  }
+  expect([...new Set(recipes.map((r) => r.tags[0]))].sort()).toEqual(['Baking', 'Other', 'Salads', 'Soups', 'Vegetarian']);
+});
+
+it('carries every field across for a recipe that has them all', async () => {
+  const tabbouleh = (await get()).find((r) => r.slug === 'tabbouleh');
+
+  expect(tabbouleh.title).toBe('Tabbouleh');
+  expect(tabbouleh.tags).toEqual(['Salads']);
+  expect(tabbouleh.servings).toBe('6');
+  expect(tabbouleh.prepTime).toBe('20 min');
+  expect(tabbouleh.cookTime).toBe('20 min');
+  expect(tabbouleh.ingredients).toContain('3 tbsp fresh lemon juice');
+  expect(tabbouleh.steps).toHaveLength(3);
+  expect(tabbouleh.notes).toMatch(/^Coarse bulgur/);
+  expect(tabbouleh.source).toEqual({ url: 'https://www.loveandlemons.com/tabbouleh/', name: 'Love and Lemons' });
+});
+
+it('leaves absent fields empty rather than dropping them', async () => {
+  const recipes = await get();
+
+  expect(recipes.find((r) => r.slug === 'potato-kugel')).toMatchObject({ description: '', notes: '', source: { url: '', name: '' } });
+  expect(recipes.find((r) => r.slug === 'peach-cobbler').source).toEqual({ url: '', name: 'preppykitchen.com' });
 });
