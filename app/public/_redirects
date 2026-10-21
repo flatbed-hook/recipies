@@ -1,1 +1,3 @@
+# ponytail: an unknown slug gets the not-found page at HTTP 200, since this is a
+# rewrite to a static shell. Serve the page from a Function if crawlers need a real 404.
 /recipes/* /recipe 200

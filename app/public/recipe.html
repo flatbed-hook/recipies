@@ -23,14 +23,16 @@ const list = (tag, items, cls) => {
   return node;
 };
 
-const slug = decodeURIComponent(location.pathname.replace(/^\/recipes\//, '').replace(/\/$/, ''));
+// Already percent-encoded by the browser, so it goes into the API path as-is.
+const slug = location.pathname.replace(/^\/recipes\//, '').replace(/\/$/, '');
 
-fetch('/api/recipes/' + encodeURIComponent(slug)).then(async (response) => {
-  if (!response.ok) {
-    document.title = 'Not found | Recipes';
-    main.append(el('h1', 'Recipe not found'), el('p', 'No recipe is stored under “' + slug + '”.'));
-    return;
-  }
+const notFound = (message) => {
+  document.title = 'Not found | Recipes';
+  main.append(el('h1', 'Recipe not found'), el('p', message));
+};
+
+fetch('/api/recipes/' + slug).then(async (response) => {
+  if (!response.ok) return notFound('No recipe is stored at this address.');
   const recipe = await response.json();
 
   document.title = recipe.title + ' | Recipes';
@@ -69,7 +71,7 @@ fetch('/api/recipes/' + encodeURIComponent(slug)).then(async (response) => {
     footer.append(link);
     main.append(footer);
   }
-});
+}).catch(() => notFound('That recipe could not be loaded. Check your connection and try again.'));
 </script>
 </body>
 </html>
