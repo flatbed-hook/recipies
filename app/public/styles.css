@@ -21,3 +21,7 @@ h2 { border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; margin-top: 2rem; }
 .recipe-list a { color: #5a3e1b; font-size: 1.15rem; text-decoration: none; }
 .recipe-list .cat { color: #888; font-size: 0.9rem; margin-left: 0.5rem; }
 
+
+/* Login gate: edit controls exist in the markup only for writers. The server enforces it. */
+.site-header .auth { float: right; font-family: system-ui, sans-serif; font-size: 0.9rem; }
+body:not(.logged-in) [data-requires-auth] { display: none !important; }
