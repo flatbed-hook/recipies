@@ -50,8 +50,8 @@ const problem = document.getElementById('form-error');
 // ?edit=<slug> turns this into the edit form. The slug comes from the URL and is never re-derived
 // from the title, so renaming a recipe leaves its shared links working.
 const editing = new URLSearchParams(location.search).get('edit');
-const api = '/api/recipes' + (editing ? '/' + encodeURIComponent(editing) : '');
-const auth = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('recipes:token') });
+const url = '/api/recipes' + (editing ? '/' + encodeURIComponent(editing) : '');
+const headers = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('recipes:token') });
 // The version this form was filled from. The server rejects a save that no longer matches it,
 // so someone else's edit is never silently overwritten.
 let loadedAt = '';
@@ -63,8 +63,9 @@ const addRow = (listId, value = '') => {
   const row = el('li');
   row.append(
     input,
-    // Reordering a step that came out of extraction in the wrong place: move it up until it fits.
-    el('button', { type: 'button', textContent: '↑', title: 'Move up', onclick: () => row.previousElementSibling && row.previousElementSibling.before(row) }),
+    // Reordering a step that came out of extraction in the wrong place: nudge it until it fits.
+    el('button', { type: 'button', textContent: '↑', title: 'Move up', ariaLabel: 'Move up', onclick: () => row.previousElementSibling && row.previousElementSibling.before(row) }),
+    el('button', { type: 'button', textContent: '↓', title: 'Move down', ariaLabel: 'Move down', onclick: () => row.nextElementSibling && row.nextElementSibling.after(row) }),
     el('button', { type: 'button', textContent: 'Remove', onclick: () => row.remove() }),
   );
   document.getElementById(listId).append(row);
@@ -108,7 +109,7 @@ form.onsubmit = async (event) => {
   const save = form.querySelector('.save');
   save.disabled = true;
 
-  const response = await fetch(api, { method: editing ? 'PUT' : 'POST', headers: auth(), body: JSON.stringify(read()) }).catch(() => null);
+  const response = await fetch(url, { method: editing ? 'PUT' : 'POST', headers: headers(), body: JSON.stringify(read()) }).catch(() => null);
 
   // Straight to the saved recipe: the whole point of leaving GitHub Pages is seeing it at once.
   if (response && response.ok) return location.assign('/recipes/' + encodeURIComponent((await response.json()).slug));
@@ -121,7 +122,7 @@ form.onsubmit = async (event) => {
 // confirm() is the confirmation. A native modal is unmissable on a phone and needs no markup.
 document.getElementById('delete').onclick = async () => {
   if (!confirm('Delete this recipe? This cannot be undone.')) return;
-  const response = await fetch(api, { method: 'DELETE', headers: auth() }).catch(() => null);
+  const response = await fetch(url, { method: 'DELETE', headers: headers() }).catch(() => null);
   if (response && response.ok) return location.assign('/');
   problem.textContent = 'Could not delete the recipe. Check your connection and try again.';
 };
@@ -130,7 +131,7 @@ if (!editing) fill();
 else {
   document.title = 'Edit recipe | Recipes';
   document.getElementById('form-title').textContent = 'Edit recipe';
-  fetch(api)
+  fetch(url)
     .then((response) => (response.ok ? response.json() : Promise.reject()))
     .then((recipe) => {
       fill(recipe);

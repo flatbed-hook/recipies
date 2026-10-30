@@ -51,15 +51,13 @@ export const recipeFrom = (input, slug, updatedAt = new Date().toISOString().rep
 // The same three rules for create and update. Ordered so the writer is told the real problem:
 // an empty title is "no title", not "no Latin letters". Update passes the URL's slug, so a
 // rename to a non-Latin title is fine there — nothing has to be derived from it.
-export const problemWith = (recipe) =>
-  !recipe.title
-    ? 'A title is required'
-    : // ponytail: no transliteration. Add one the first time a native-script title is wanted.
-      !recipe.slug
-      ? 'That title has no Latin letters or digits, so no web address can be made from it. Add a title in Latin script.'
-      : !recipe.ingredients.length || !recipe.steps.length
-        ? 'At least one ingredient and one step are required'
-        : null;
+export const problemWith = (recipe) => {
+  if (!recipe.title) return 'A title is required';
+  // ponytail: no transliteration. Add one the first time a native-script title is wanted.
+  if (!recipe.slug) return 'That title has no Latin letters or digits, so no web address can be made from it. Add a title in Latin script.';
+  if (!recipe.ingredients.length || !recipe.steps.length) return 'At least one ingredient and one step are required';
+  return null;
+};
 
 export const onRequestPost = async (context) => {
   const denied = await requireAuth(context); // Belt and braces: _middleware.js checks this too.
