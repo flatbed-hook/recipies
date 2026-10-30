@@ -13,7 +13,7 @@ const BROWSER = {
 // fallback — a page without machine-readable markup is an accepted limitation, not a bug.
 const BY_HAND = 'No recipe markup was found on that page. Paste the recipe in by hand below instead.';
 
-const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+const ENTITIES = { __proto__: null, amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
 const entity = (match, name) => {
   if (name[0] !== '#') return ENTITIES[name.toLowerCase()] ?? match;
@@ -29,7 +29,7 @@ const text = (value) =>
         .replace(/<[^>]*>/g, ' ')
         .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, entity)
         .replace(/\s+/g, ' ')
-        .replace(/ ([.,;:!?)])/g, '$1') // A stripped <b> inside a sentence must not leave "bulgur ."
+        .replace(/ ([.,;:!?])/g, '$1') // A stripped <b> inside a sentence must not leave "bulgur ."
         .trim()
     : '';
 
@@ -42,7 +42,7 @@ const first = (value) => (Array.isArray(value) ? first(value[0]) : value);
 // which is how sites that use one blob separate their steps.
 const lines = (value) => {
   if (Array.isArray(value)) return value.flatMap(lines);
-  if (value && typeof value === 'object') return lines(value.itemListElement ?? value.text ?? value.name ?? '');
+  if (value && typeof value === 'object') return lines(value.itemListElement || value.text || value.name || '');
   if (typeof value === 'string') return value.split(/<\/(?:p|li|div)>|<br\s*\/?>|[\r\n]+/i).map(text).filter(Boolean);
   return [];
 };
@@ -50,17 +50,25 @@ const lines = (value) => {
 // ISO-8601 durations become the style the 16 migrated recipes already use: "20 min", "1 hr 15 min".
 // Anything that is not a duration is kept as text — plenty of sites put "about 30 minutes" in here.
 const duration = (value) => {
-  const parts = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?$/.exec(text(value).toUpperCase());
+  const parts = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(text(value).toUpperCase());
   if (!parts) return text(value);
-  const [days, hours, minutes] = parts.slice(1).map(Number);
-  const hr = (days || 0) * 24 + (hours || 0);
+  const [weeks, days, hours, minutes] = parts.slice(1).map(Number);
+  const hr = (weeks || 0) * 168 + (days || 0) * 24 + (hours || 0);
+  // Seconds are deliberately not rendered: PT0S means "unset", and no recipe times a step to the second.
   return [hr && `${hr} hr`, minutes && `${minutes} min`].filter(Boolean).join(' ');
 };
 
-// image is a string, an ImageObject, or an array of either. recipeFrom drops anything not http(s).
-const image = (value) => {
+// image is a string, an ImageObject, or an array of either. recipeFrom drops anything not http(s),
+// so a site publishing "/uploads/photo.jpg" or "//cdn/photo.jpg" would silently lose its picture —
+// resolve against the page URL first.
+const image = (value, base) => {
   const one = first(value);
-  return typeof one === 'string' ? one : text(one?.url);
+  const raw = typeof one === 'string' ? one : text(one?.url);
+  try {
+    return raw ? new URL(raw, base).href : '';
+  } catch {
+    return '';
+  }
 };
 
 // --- JSON-LD ------------------------------------------------------------------------------------
@@ -108,7 +116,7 @@ const extract = (html, url) => {
     servings: text(first(node.recipeYield)),
     prepTime: duration(node.prepTime),
     cookTime: duration(node.cookTime),
-    image: image(node.image),
+    image: image(node.image, url),
     ingredients: lines(node.recipeIngredient ?? node.ingredients),
     steps: lines(node.recipeInstructions),
     source: { url, name: siteName(html, url) },

@@ -305,3 +305,44 @@ it('is shut by the deny-by-default middleware before the handler is even reached
 
   expect({ reached, status: response.status }).toEqual({ reached: false, status: 401 });
 });
+
+// ── Regressions found by code review of 80e227b ───────────────────────────────
+
+it('does not resolve entity names up the prototype chain', async () => {
+  // ENTITIES was a plain object, so "&constructor;" returned Object's source and spliced it
+  // into the recipe text. Any page containing that literal was corrupted.
+  const recipe = await extracted(recipeLd({ description: 'Mix &constructor; well' }));
+  expect(recipe.description).toBe('Mix &constructor; well');
+  expect(recipe.description).not.toMatch(/native code/);
+});
+
+it('treats a zero or seconds-bearing duration as unset rather than printing it raw', async () => {
+  // PT0S is what recipe plugins emit for a time that was never filled in.
+  const zero = await extracted(recipeLd({ prepTime: 'PT0S', cookTime: 'PT1H30M0S' }));
+  expect(zero.prepTime).toBe('');
+  expect(zero.cookTime).toBe('1 hr 30 min');
+  const week = await extracted(recipeLd({ prepTime: 'P1W' }));
+  expect(week.prepTime).toBe('168 hr');
+  const seconds = await extracted(recipeLd({ prepTime: 'PT45S' }));
+  expect(seconds.prepTime).toBe('');
+});
+
+it('falls back to a step name when its text is present but empty', async () => {
+  const recipe = await extracted(
+    recipeLd({ recipeInstructions: [{ '@type': 'HowToStep', text: '', name: 'Soak the bulgur.' }] }),
+  );
+  expect(recipe.steps).toEqual(['Soak the bulgur.']);
+});
+
+it('resolves relative and protocol-relative image URLs against the page', async () => {
+  expect((await extracted(recipeLd({ image: '/uploads/photo.jpg' }))).image)
+    .toBe('https://www.example-kitchen.com/uploads/photo.jpg');
+  expect((await extracted(recipeLd({ image: '//cdn.example.com/photo.jpg' }))).image)
+    .toBe('https://cdn.example.com/photo.jpg');
+  expect((await extracted(recipeLd({ image: 'javascript:alert(1)' }))).image).toBe('');
+});
+
+it('does not eat a legitimate space before a closing parenthesis', async () => {
+  const recipe = await extracted(recipeLd({ recipeInstructions: ['Serve with pita ( warmed ) .'] }));
+  expect(recipe.steps).toEqual(['Serve with pita ( warmed ).']);
+});
