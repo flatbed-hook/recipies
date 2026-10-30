@@ -274,6 +274,11 @@ rewritten and the same URL still yields the same recipe JSON, the tests must not
 
 ### The seam
 
+**Amendment (ticket 09):** client-side filtering has no HTTP seam, so its matching rules live in a
+pure function tested directly. This is a second, deliberate seam, taken in preference to adding a DOM
+testing dependency to reach behaviour the API seam cannot see. It applies only to pure browser logic.
+
+
 **One seam: the HTTP API.** Tests invoke the Pages Functions handler directly against a real local D1
 instance, which the Cloudflare Workers test tooling provides. `fetch` is stubbed for extraction tests so
 the suite never depends on a live third-party recipe site being up or unchanged.
