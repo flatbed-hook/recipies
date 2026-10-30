@@ -123,6 +123,49 @@ const extract = (html, url) => {
   };
 };
 
+// This endpoint fetches a URL the writer supplies, so it is a fetch proxy for anyone holding the
+// shared password — and following redirects means a public link can land somewhere private. Refuse
+// anything that is not a public hostname, before and after the redirect chain.
+// ponytail: name-based, so it does not catch a public name resolving to a private address (DNS
+// rebinding). Cloudflare Workers cannot reach RFC1918 space anyway; this blocks the obvious probes.
+const PRIVATE_HOST =
+  /^(localhost$|.*\.local$|.*\.internal$|\[|0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i;
+
+const isPublic = (value) => {
+  try {
+    const { protocol, hostname } = new URL(value);
+    return /^https?:$/.test(protocol) && !PRIVATE_HOST.test(hostname) && hostname.includes('.');
+  } catch {
+    return false;
+  }
+};
+
+// A pin is not a recipe page: the real URL is buried in the JSON Pinterest embeds. Pull the first
+// off-site link out and extract from that instead.
+// ponytail: best-effort by construction. Pinterest's robots.txt disallows everything and this
+// depends on their embedded JSON shape, so it is expected to break — when it does, the writer gets
+// the ordinary paste-by-hand message. No retries, no caching, no propping it up.
+const PIN = /^(www\.)?(pinterest\.[a-z.]+|pin\.it)$/i;
+
+const pinTarget = (html) => {
+  for (const [, link] of html.matchAll(/"(?:link|url)"\s*:\s*"(https?:\/\/[^"]+)"/gi)) {
+    const candidate = link.replace(/\\\//g, '/');
+    try {
+      if (!PIN.test(new URL(candidate).hostname) && isPublic(candidate)) return candidate;
+    } catch {
+      // Not a URL we can use; keep looking.
+    }
+  }
+  return null;
+};
+
+const fetchPage = async (url) => {
+  const response = await fetch(url, { headers: BROWSER }).catch(() => null);
+  // response.url is where the redirect chain actually landed — re-check it, since the host that
+  // was public at the start of the chain is not necessarily the host at the end of it.
+  return response?.ok && isPublic(response.url || url) ? response : null;
+};
+
 export const onRequestPost = async (context) => {
   const denied = await requireAuth(context); // Belt and braces: _middleware.js checks this too.
   if (denied) return denied;
@@ -130,11 +173,19 @@ export const onRequestPost = async (context) => {
   const { url } = (await context.request.json().catch(() => ({}))) ?? {};
   if (!/^https?:\/\//i.test(String(url ?? '')))
     return Response.json({ error: 'Paste a recipe link starting with http:// or https://' }, { status: 400 });
+  if (!isPublic(url))
+    return Response.json({ error: 'That page could not be fetched. Check the link, or paste the recipe in by hand below.' }, { status: 502 });
 
-  // ponytail: redirect:'follow' is the default, so a shortened link already lands on the real page
-  // and response.url is where it landed. Ticket 07 resolves Pinterest pins ahead of this fetch.
-  const response = await fetch(url, { headers: BROWSER }).catch(() => null);
-  if (!response?.ok) return Response.json({ error: 'That page could not be fetched. Check the link, or paste the recipe in by hand below.' }, { status: 502 });
+  // redirect:'follow' is the default, so a shortened link already lands on the real page and
+  // response.url is where it landed. Only pins need resolving by hand.
+  let response = await fetchPage(url);
+  if (response && PIN.test(new URL(response.url || url).hostname)) {
+    const target = pinTarget(await response.text());
+    // A dead pin, or one whose source cannot be found, falls through to the same message every
+    // other unextractable page gets. The writer must not be able to tell the difference.
+    response = target ? await fetchPage(target) : null;
+  }
+  if (!response) return Response.json({ error: 'That page could not be fetched. Check the link, or paste the recipe in by hand below.' }, { status: 502 });
   // Untrusted endpoint: only parse what claims to be HTML, so a PDF or a video is refused cheaply
   // rather than read into memory and run through the script regex.
   if (!/html/i.test(response.headers.get('content-type') ?? '')) return Response.json({ error: BY_HAND }, { status: 422 });

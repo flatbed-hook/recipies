@@ -346,3 +346,79 @@ it('does not eat a legitimate space before a closing parenthesis', async () => {
   const recipe = await extracted(recipeLd({ recipeInstructions: ['Serve with pita ( warmed ) .'] }));
   expect(recipe.steps).toEqual(['Serve with pita ( warmed ).']);
 });
+
+// ── Ticket 07: short links and Pinterest pins ────────────────────────────────
+
+// Response.url is read-only, so a redirect is stubbed by handing back a response whose url is the
+// landing page rather than the one that was requested — which is exactly what fetch does for real.
+const landsOn = (finalUrl, body, { status = 200, type = 'text/html; charset=utf-8' } = {}) => {
+  const stub = vi.fn(async () => {
+    const response = new Response(body, { status, headers: { 'content-type': type } });
+    Object.defineProperty(response, 'url', { value: finalUrl });
+    return response;
+  });
+  vi.stubGlobal('fetch', stub);
+  return stub;
+};
+
+const PIN_URL = 'https://pin.it/abc123';
+const pinPage = (target) =>
+  `<html><body><script>{"resource_response":{"data":{"link":${JSON.stringify(target)}}}}</script></body></html>`;
+
+it('follows a redirect chain and parses the page it landed on, not the link that was pasted', async () => {
+  const real = 'https://www.example-kitchen.com/recipes/tabbouleh';
+  const stub = landsOn(real, page(recipeLd()));
+
+  const recipe = await (await post({ url: 'https://bit.ly/short' })).json();
+
+  expect(stub).toHaveBeenCalledWith('https://bit.ly/short', expect.anything()); // requested the short link
+  expect(recipe.source.url).toBe(real); // recorded where it landed
+  expect(recipe.title).toBe('Tabbouleh');
+});
+
+it('resolves a Pinterest pin to its underlying source and extracts from there', async () => {
+  const target = 'https://www.example-kitchen.com/recipes/tabbouleh';
+  const stub = vi.fn(async (requested) => {
+    const pin = String(requested).includes('pin.it');
+    const response = new Response(pin ? pinPage(target) : page(recipeLd()), {
+      headers: { 'content-type': 'text/html' },
+    });
+    Object.defineProperty(response, 'url', { value: String(requested) });
+    return response;
+  });
+  vi.stubGlobal('fetch', stub);
+
+  const recipe = await (await post({ url: PIN_URL })).json();
+
+  expect(stub).toHaveBeenCalledTimes(2); // the pin, then its source
+  expect(recipe.title).toBe('Tabbouleh');
+  expect(recipe.source.url).toBe(target); // the pin is never recorded as the source
+});
+
+it('fails a dead pin exactly like any other unextractable page', async () => {
+  const dead = await failure(pinPage('https://pinterest.com/pin/other'), { status: 404 });
+  const ordinary = await failure('<html><body><p>No markup here.</p></body></html>', { status: 404 });
+
+  expect(dead).toEqual(ordinary); // indistinguishable: same status, same words
+  expect(dead.error).not.toMatch(/pin/i); // and nothing Pinterest-specific leaks to the writer
+});
+
+it('fails a pin whose source cannot be found, without naming Pinterest', async () => {
+  landsOn(PIN_URL, '<html><body><script>{"resource_response":{"data":{}}}</script></body></html>');
+
+  const response = await post({ url: PIN_URL });
+
+  expect(response.status).toBe(502);
+  expect((await response.json()).error).not.toMatch(/pin/i);
+});
+
+it('refuses to be used as a proxy for non-public hosts, before and after a redirect', async () => {
+  const direct = await post({ url: 'http://169.254.169.254/latest/meta-data/' });
+  expect(direct.status).toBe(502);
+
+  // A public link that redirects somewhere private must not be read either.
+  landsOn('http://192.168.1.1/admin', page(recipeLd()));
+  const redirected = await post({ url: 'https://bit.ly/short' });
+  expect(redirected.status).toBe(502);
+  expect((await redirected.json()).error).toBe((await direct.json()).error);
+});
