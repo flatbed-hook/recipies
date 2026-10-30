@@ -130,6 +130,34 @@ it('rejects a recipe with no usable title, ingredients, or steps', async () => {
   expect((await create(complete({ title: 'No Steps', steps: [] }))).status).toBe(400);
 });
 
+// There is no delete endpoint yet, so a record that slips through is permanent: a non-string
+// title must not be good enough to claim a slug while being stored as "".
+it('never stores a recipe that has a slug but no title, whatever type the title arrived as', async () => {
+  for (const title of [['Pie'], { name: 'Pie' }, null, true]) {
+    const response = await create(complete({ title }));
+    expect(response.status).toBe(400);
+  }
+  expect(await listSlugs()).toEqual(expect.not.arrayContaining(['pie', 'true']));
+
+  // A number is a usable title, so this one is stored — but with the digits as its title, not "".
+  // An empty title would render as an unclickable blank link that no endpoint yet can remove.
+  expect(await (await create(complete({ title: 2024 }))).json()).toMatchObject({ slug: '2024', title: '2024' });
+});
+
+it('tells a writer whose title has no Latin letters what is actually wrong', async () => {
+  const response = await create(complete({ title: 'עוגת גבינה' }));
+
+  expect(response.status).toBe(400);
+  expect((await response.json()).error).toMatch(/Latin/);
+});
+
+// Ticket 06 extracts schema.org JSON-LD, where recipeYield is routinely a bare number.
+it('keeps a numeric field instead of silently dropping it', async () => {
+  const created = await (await create(complete({ title: 'Numeric Yield', servings: 4 }))).json();
+
+  expect(created.servings).toBe('4');
+});
+
 // Untrusted input: the detail page renders source.url as a link href and image as an img src.
 it('drops unknown keys and non-http URLs rather than storing them', async () => {
   const created = await (await create(

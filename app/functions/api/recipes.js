@@ -17,49 +17,65 @@ export const slugify = (title) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-const str = (value) => (typeof value === 'string' ? value.trim() : '');
+// Numbers count: schema.org hands back recipeYield as a bare number often enough that ignoring
+// them would silently drop the servings of recipes ticket 06 extracts.
+const str = (value) => (typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '');
 const list = (value) => (Array.isArray(value) ? value.map(str).filter(Boolean) : []);
 // The detail page puts these straight into an <a href> and an <img src>, so only http(s) survives.
 const link = (value) => (/^https?:\/\//i.test(str(value)) ? str(value) : '');
 
 // Untrusted input in, exactly the 13 stored keys out: unknown keys dropped, absent values "" and
 // never missing, so hand-created recipes stay interchangeable with the migrated ones.
-export const recipeFrom = (input, slug, updatedAt = new Date().toISOString().replace(/\.\d+Z$/, 'Z')) => ({
-  slug,
-  title: str(input.title),
-  description: str(input.description),
-  tags: list(input.tags),
-  servings: str(input.servings),
-  prepTime: str(input.prepTime),
-  cookTime: str(input.cookTime),
-  image: link(input.image),
-  ingredients: list(input.ingredients),
-  steps: list(input.steps),
-  notes: str(input.notes),
-  source: { url: link(input.source?.url), name: str(input.source?.name) },
-  updatedAt,
-});
+// The slug defaults to one derived from the *stored* title, so there is a single definition of
+// the title: one the normaliser rejects can never still yield a slug. Ticket 08 passes the
+// existing slug instead, to keep links stable across a rename.
+export const recipeFrom = (input, slug, updatedAt = new Date().toISOString().replace(/\.\d+Z$/, 'Z')) => {
+  const title = str(input.title);
+  return {
+    slug: slug ?? slugify(title),
+    title,
+    description: str(input.description),
+    tags: list(input.tags),
+    servings: str(input.servings),
+    prepTime: str(input.prepTime),
+    cookTime: str(input.cookTime),
+    image: link(input.image),
+    ingredients: list(input.ingredients),
+    steps: list(input.steps),
+    notes: str(input.notes),
+    source: { url: link(input.source?.url), name: str(input.source?.name) },
+    updatedAt,
+  };
+};
 
 export const onRequestPost = async (context) => {
   const denied = await requireAuth(context); // Belt and braces: _middleware.js checks this too.
   if (denied) return denied;
 
   const input = await context.request.json().catch(() => ({}));
-  const slug = slugify(input?.title);
-  if (!slug) return Response.json({ error: 'A title is required' }, { status: 400 });
+  const recipe = recipeFrom(input ?? {});
 
-  const recipe = recipeFrom(input ?? {}, slug);
+  if (!recipe.slug)
+    return Response.json(
+      {
+        // ponytail: no transliteration. Add one the first time a native-script title is wanted.
+        error: recipe.title
+          ? 'That title has no Latin letters or digits, so no web address can be made from it. Add a title in Latin script.'
+          : 'A title is required',
+      },
+      { status: 400 },
+    );
   if (!recipe.ingredients.length || !recipe.steps.length)
     return Response.json({ error: 'At least one ingredient and one step are required' }, { status: 400 });
 
   try {
     // Plain INSERT, never INSERT OR REPLACE: a collision is reported, never silently overwritten.
     await context.env.DB.prepare('INSERT INTO recipes (slug, json, updated_at) VALUES (?, ?, ?)')
-      .bind(slug, JSON.stringify(recipe), recipe.updatedAt)
+      .bind(recipe.slug, JSON.stringify(recipe), recipe.updatedAt)
       .run();
   } catch (error) {
     if (!/UNIQUE|constraint/i.test(error.message)) throw error;
-    return Response.json({ error: `A recipe already exists at "${slug}". Give this one a different title.` }, { status: 409 });
+    return Response.json({ error: `A recipe already exists at "${recipe.slug}". Give this one a different title.` }, { status: 409 });
   }
 
   return Response.json(recipe, { status: 201 });

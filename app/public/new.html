@@ -86,6 +86,11 @@ const read = () => {
 form.onsubmit = async (event) => {
   event.preventDefault();
   problem.textContent = '';
+  // One save at a time. A second click on a slow connection 409s against the first, which would
+  // flash "a recipe already exists" for a recipe that in fact saved perfectly well.
+  const save = form.querySelector('.save');
+  save.disabled = true;
+
   const response = await fetch('/api/recipes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('recipes:token') },
@@ -94,6 +99,8 @@ form.onsubmit = async (event) => {
 
   // Straight to the saved recipe: the whole point of leaving GitHub Pages is seeing it at once.
   if (response && response.ok) return location.assign('/recipes/' + encodeURIComponent((await response.json()).slug));
+
+  save.disabled = false;
   const body = response ? await response.json().catch(() => ({})) : {};
   problem.textContent = body.error || 'Could not save the recipe. Check your connection and try again.';
 };

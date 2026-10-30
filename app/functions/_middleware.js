@@ -6,6 +6,10 @@ import { requireAuth } from './api/login.js';
 //
 // POST /api/login is the one exemption: it is how a token is obtained, so blocking it would lock
 // the site for everyone, permanently. It does its own password check.
+// ponytail: at the Functions root, so it is measured to run on static assets too — /styles.css
+// and /auth.js each spend a Functions invocation instead of being served straight off the edge.
+// Bought deliberately: it covers any future endpoint, not just the ones under /api. Move this
+// file to functions/api/_middleware.js if that hop ever shows up in the request budget.
 const SAFE = ['GET', 'HEAD'];
 
 export const onRequest = async (context) => {
