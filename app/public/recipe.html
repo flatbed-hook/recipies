@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<header class="site-header"><a href="/">← All Recipes</a></header>
+<header class="site-header"><a href="/">← All Recipes</a> <a id="edit-link" data-requires-auth>Edit</a></header>
 <main id="recipe"></main>
 <script>
 const main = document.getElementById('recipe');
@@ -25,6 +25,8 @@ const list = (tag, items, cls) => {
 
 // Already percent-encoded by the browser, so it goes into the API path as-is.
 const slug = location.pathname.replace(/^\/recipes\//, '').replace(/\/$/, '');
+// Editing and deleting both live on the form at /new; the server is what enforces the token.
+document.getElementById('edit-link').href = '/new?edit=' + slug;
 
 const notFound = (message) => {
   document.title = 'Not found | Recipes';
@@ -73,5 +75,6 @@ fetch('/api/recipes/' + slug).then(async (response) => {
   }
 }).catch(() => notFound('That recipe could not be loaded. Check your connection and try again.'));
 </script>
+<script src="/auth.js"></script>
 </body>
 </html>

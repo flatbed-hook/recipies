@@ -45,5 +45,6 @@ body.logged-in [data-requires-noauth] { display: none !important; }
 .recipe-form .rows button { font: inherit; flex-shrink: 0; }
 .recipe-form .save, .recipe-form .fetch { font: inherit; }
 .recipe-form .save, .recipe-form .fetch { padding: 0.6rem 1.2rem; }
+.recipe-form .delete { font: inherit; padding: 0.6rem 1.2rem; margin-left: 0.5rem; color: #a12; }
 .recipe-form .form-error { color: #a12; font-weight: bold; }
 .recipe-form .form-error:empty { display: none; }
