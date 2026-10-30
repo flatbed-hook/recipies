@@ -9,9 +9,9 @@
 <body>
 <header class="site-header"><a href="/">← All Recipes</a></header>
 <main>
-<p data-requires-noauth>Log in to add a recipe.</p>
+<p data-requires-noauth>Log in to add or edit a recipe.</p>
 <form id="recipe-form" class="recipe-form" data-requires-auth>
-  <h1>New recipe</h1>
+  <h1 id="form-title">New recipe</h1>
   <label>Title <input name="title" required autofocus></label>
   <label>Description <textarea name="description" rows="2"></textarea></label>
   <label>Tags <small>comma separated</small> <input name="tags" placeholder="Salads, Make-ahead"></label>
@@ -38,6 +38,7 @@
 
   <p class="form-error" id="form-error" role="alert"></p>
   <button class="save">Save recipe</button>
+  <button type="button" class="delete" id="delete" hidden>Delete recipe</button>
 </form>
 </main>
 <script>
@@ -46,12 +47,26 @@
 const form = document.getElementById('recipe-form');
 const problem = document.getElementById('form-error');
 
+// ?edit=<slug> turns this into the edit form. The slug comes from the URL and is never re-derived
+// from the title, so renaming a recipe leaves its shared links working.
+const editing = new URLSearchParams(location.search).get('edit');
+const api = '/api/recipes' + (editing ? '/' + encodeURIComponent(editing) : '');
+const auth = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('recipes:token') });
+// The version this form was filled from. The server rejects a save that no longer matches it,
+// so someone else's edit is never silently overwritten.
+let loadedAt = '';
+
 const el = (tag, props) => Object.assign(document.createElement(tag), props);
 
 const addRow = (listId, value = '') => {
   const input = el('input', { value, className: 'row-input' });
   const row = el('li');
-  row.append(input, el('button', { type: 'button', textContent: 'Remove', onclick: () => row.remove() }));
+  row.append(
+    input,
+    // Reordering a step that came out of extraction in the wrong place: move it up until it fits.
+    el('button', { type: 'button', textContent: '↑', title: 'Move up', onclick: () => row.previousElementSibling && row.previousElementSibling.before(row) }),
+    el('button', { type: 'button', textContent: 'Remove', onclick: () => row.remove() }),
+  );
   document.getElementById(listId).append(row);
   return input;
 };
@@ -61,6 +76,7 @@ const rows = (listId) => [...document.querySelectorAll('#' + listId + ' .row-inp
 for (const button of form.querySelectorAll('[data-add]')) button.onclick = () => addRow(button.dataset.add).focus();
 
 const fill = (recipe = {}) => {
+  loadedAt = recipe.updatedAt || '';
   for (const field of form.elements) if (field.name && field.name in recipe) field.value = recipe[field.name];
   form.tags.value = (recipe.tags || []).join(', ');
   form.sourceUrl.value = (recipe.source || {}).url || '';
@@ -80,6 +96,7 @@ const read = () => {
     ingredients: rows('ingredients'),
     steps: rows('steps'),
     source: { url: data.get('sourceUrl'), name: data.get('sourceName') },
+    updatedAt: loadedAt, // Ignored on create; the conflict check on update.
   };
 };
 
@@ -91,11 +108,7 @@ form.onsubmit = async (event) => {
   const save = form.querySelector('.save');
   save.disabled = true;
 
-  const response = await fetch('/api/recipes', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('recipes:token') },
-    body: JSON.stringify(read()),
-  }).catch(() => null);
+  const response = await fetch(api, { method: editing ? 'PUT' : 'POST', headers: auth(), body: JSON.stringify(read()) }).catch(() => null);
 
   // Straight to the saved recipe: the whole point of leaving GitHub Pages is seeing it at once.
   if (response && response.ok) return location.assign('/recipes/' + encodeURIComponent((await response.json()).slug));
@@ -105,7 +118,29 @@ form.onsubmit = async (event) => {
   problem.textContent = body.error || 'Could not save the recipe. Check your connection and try again.';
 };
 
-fill();
+// confirm() is the confirmation. A native modal is unmissable on a phone and needs no markup.
+document.getElementById('delete').onclick = async () => {
+  if (!confirm('Delete this recipe? This cannot be undone.')) return;
+  const response = await fetch(api, { method: 'DELETE', headers: auth() }).catch(() => null);
+  if (response && response.ok) return location.assign('/');
+  problem.textContent = 'Could not delete the recipe. Check your connection and try again.';
+};
+
+if (!editing) fill();
+else {
+  document.title = 'Edit recipe | Recipes';
+  document.getElementById('form-title').textContent = 'Edit recipe';
+  fetch(api)
+    .then((response) => (response.ok ? response.json() : Promise.reject()))
+    .then((recipe) => {
+      fill(recipe);
+      document.getElementById('delete').hidden = false;
+    })
+    .catch(() => {
+      problem.textContent = 'That recipe could not be loaded, so there is nothing to edit yet.';
+      form.querySelector('.save').disabled = true;
+    });
+}
 </script>
 <script src="auth.js"></script>
 </body>
