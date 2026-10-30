@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New recipe | Recipes</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="site-header"><a href="/">← All Recipes</a></header>
+<main>
+<p data-requires-noauth>Log in to add a recipe.</p>
+<form id="recipe-form" class="recipe-form" data-requires-auth>
+  <h1>New recipe</h1>
+  <label>Title <input name="title" required autofocus></label>
+  <label>Description <textarea name="description" rows="2"></textarea></label>
+  <label>Tags <small>comma separated</small> <input name="tags" placeholder="Salads, Make-ahead"></label>
+  <label>Servings <input name="servings"></label>
+  <label>Prep time <input name="prepTime" placeholder="20 min"></label>
+  <label>Cook time <input name="cookTime" placeholder="1 hr"></label>
+  <label>Image URL <input name="image" type="url"></label>
+
+  <fieldset>
+    <legend>Ingredients</legend>
+    <ul class="rows" id="ingredients"></ul>
+    <button type="button" data-add="ingredients">Add ingredient</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Steps</legend>
+    <ol class="rows" id="steps"></ol>
+    <button type="button" data-add="steps">Add step</button>
+  </fieldset>
+
+  <label>Notes <textarea name="notes" rows="2"></textarea></label>
+  <label>Source URL <input name="sourceUrl" type="url"></label>
+  <label>Source name <input name="sourceName"></label>
+
+  <p class="form-error" id="form-error" role="alert"></p>
+  <button class="save">Save recipe</button>
+</form>
+</main>
+<script>
+// The form and the save path here are reused by URL extraction (ticket 06) and editing (08):
+// fill() puts a recipe object into the fields, read() takes it back out.
+const form = document.getElementById('recipe-form');
+const problem = document.getElementById('form-error');
+
+const el = (tag, props) => Object.assign(document.createElement(tag), props);
+
+const addRow = (listId, value = '') => {
+  const input = el('input', { value, className: 'row-input' });
+  const row = el('li');
+  row.append(input, el('button', { type: 'button', textContent: 'Remove', onclick: () => row.remove() }));
+  document.getElementById(listId).append(row);
+  return input;
+};
+
+const rows = (listId) => [...document.querySelectorAll('#' + listId + ' .row-input')].map((input) => input.value.trim()).filter(Boolean);
+
+for (const button of form.querySelectorAll('[data-add]')) button.onclick = () => addRow(button.dataset.add).focus();
+
+const fill = (recipe = {}) => {
+  for (const field of form.elements) if (field.name && field.name in recipe) field.value = recipe[field.name];
+  form.tags.value = (recipe.tags || []).join(', ');
+  form.sourceUrl.value = (recipe.source || {}).url || '';
+  form.sourceName.value = (recipe.source || {}).name || '';
+  for (const listId of ['ingredients', 'steps']) {
+    document.getElementById(listId).replaceChildren();
+    // Three blank rows on the end, so the form is usable without clicking Add first.
+    for (const value of [...(recipe[listId] || []), '', '', '']) addRow(listId, value);
+  }
+};
+
+const read = () => {
+  const data = new FormData(form);
+  return {
+    ...Object.fromEntries(data),
+    tags: data.get('tags').split(',').map((tag) => tag.trim()).filter(Boolean),
+    ingredients: rows('ingredients'),
+    steps: rows('steps'),
+    source: { url: data.get('sourceUrl'), name: data.get('sourceName') },
+  };
+};
+
+form.onsubmit = async (event) => {
+  event.preventDefault();
+  problem.textContent = '';
+  // One save at a time. A second click on a slow connection 409s against the first, which would
+  // flash "a recipe already exists" for a recipe that in fact saved perfectly well.
+  const save = form.querySelector('.save');
+  save.disabled = true;
+
+  const response = await fetch('/api/recipes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('recipes:token') },
+    body: JSON.stringify(read()),
+  }).catch(() => null);
+
+  // Straight to the saved recipe: the whole point of leaving GitHub Pages is seeing it at once.
+  if (response && response.ok) return location.assign('/recipes/' + encodeURIComponent((await response.json()).slug));
+
+  save.disabled = false;
+  const body = response ? await response.json().catch(() => ({})) : {};
+  problem.textContent = body.error || 'Could not save the recipe. Check your connection and try again.';
+};
+
+fill();
+</script>
+<script src="auth.js"></script>
+</body>
+</html>

@@ -34,3 +34,16 @@ h2 { border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; margin-top: 2rem; }
 /* Login gate: edit controls exist in the markup only for writers. The server enforces it. */
 .site-header .auth { float: right; font-family: system-ui, sans-serif; font-size: 0.9rem; }
 body:not(.logged-in) [data-requires-auth] { display: none !important; }
+body.logged-in [data-requires-noauth] { display: none !important; }
+
+/* The add form. Full-width fields, so it is usable one-handed on a phone. */
+.recipe-form label, .recipe-form fieldset { display: block; margin: 1rem 0; }
+.recipe-form input, .recipe-form textarea { display: block; width: 100%; box-sizing: border-box; padding: 0.4rem; font: inherit; }
+.recipe-form small { color: #888; font-size: 0.8rem; }
+.recipe-form .rows { padding-left: 1.2rem; }
+.recipe-form .rows li { display: flex; gap: 0.5rem; margin-bottom: 0.4rem; }
+.recipe-form .rows button { font: inherit; flex-shrink: 0; }
+.recipe-form .save { font: inherit; }
+.recipe-form .save { padding: 0.6rem 1.2rem; }
+.recipe-form .form-error { color: #a12; font-weight: bold; }
+.recipe-form .form-error:empty { display: none; }
