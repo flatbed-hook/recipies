@@ -10,11 +10,27 @@
 <header class="site-header"><a href="/">Recipes</a></header>
 <main>
 <h1>Recipes</h1>
+<div class="filters">
+<input type="search" id="search" placeholder="Search titles, ingredients, tags" aria-label="Search recipes">
+<span id="tags"></span>
+<button type="button" id="clear">Clear</button>
+</div>
 <ul class="recipe-list" id="recipe-list"></ul>
+<p class="empty" id="empty" hidden>Nothing matches that. Try a different word, or clear the search.</p>
 </main>
-<script>
-fetch('/api/recipes').then((r) => r.json()).then((recipes) => {
-  document.getElementById('recipe-list').append(...recipes.map((recipe) => {
+<script type="module">
+import { filterRecipes } from './search.js';
+
+const search = document.getElementById('search');
+const tagBar = document.getElementById('tags');
+const list = document.getElementById('recipe-list');
+const empty = document.getElementById('empty');
+let recipes = [];
+let activeTag = '';
+
+const render = () => {
+  const shown = filterRecipes(recipes, search.value, activeTag);
+  list.replaceChildren(...shown.map((recipe) => {
     const a = document.createElement('a');
     a.href = '/recipes/' + encodeURIComponent(recipe.slug);
     a.textContent = recipe.title;
@@ -22,6 +38,31 @@ fetch('/api/recipes').then((r) => r.json()).then((recipes) => {
     li.append(a);
     return li;
   }));
+  empty.hidden = shown.length > 0 || recipes.length === 0;
+  for (const button of tagBar.children) button.classList.toggle('active', button.textContent === activeTag);
+};
+
+// 16 recipes filter in well under a frame, so this runs straight off the keystroke. No debounce.
+search.oninput = render;
+document.getElementById('clear').onclick = () => {
+  search.value = '';
+  activeTag = '';
+  render();
+};
+
+fetch('/api/recipes').then((r) => r.json()).then((loaded) => {
+  recipes = loaded;
+  tagBar.append(...[...new Set(recipes.flatMap((recipe) => recipe.tags || []))].sort().map((tag) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = tag;
+    button.onclick = () => {
+      activeTag = activeTag === tag ? '' : tag; // Clicking the active tag turns it off.
+      render();
+    };
+    return button;
+  }));
+  render();
 });
 </script>
 <script src="auth.js"></script>

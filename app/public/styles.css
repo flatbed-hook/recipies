@@ -21,6 +21,15 @@ h2 { border-bottom: 1px solid #ddd; padding-bottom: 0.25rem; margin-top: 2rem; }
 .recipe-list a { color: #5a3e1b; font-size: 1.15rem; text-decoration: none; }
 .recipe-list .cat { color: #888; font-size: 0.9rem; margin-left: 0.5rem; }
 
+/* Search and tag filter. Filtering is client-side over the already-fetched array. */
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 1rem 0; }
+.filters input, .filters button { font: inherit; font-size: 0.95rem; }
+.filters input { flex: 1 1 14rem; padding: 0.5rem 0.7rem; border: 1px solid #d8cdb8; border-radius: 4px; background: #fff; }
+.filters #tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.filters button { padding: 0.35rem 0.7rem; border: 1px solid #d8cdb8; border-radius: 999px; background: #f3ede2; color: #5a3e1b; cursor: pointer; }
+.filters button.active { background: #5a3e1b; border-color: #5a3e1b; color: #f3ede2; }
+.empty { color: #777; font-style: italic; }
+
 
 /* Login gate: edit controls exist in the markup only for writers. The server enforces it. */
 .site-header .auth { float: right; font-family: system-ui, sans-serif; font-size: 0.9rem; }
