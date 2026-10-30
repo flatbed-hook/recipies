@@ -50,8 +50,8 @@ it('strips diacritics both ways', () => {
 
 it('filters by a clicked tag', () => {
   expect(titles('', 'Soups').length).toBeGreaterThan(0);
-  expect(titles('', 'Soups').every((t) => t)).toBe(true);
   for (const r of filterRecipes(recipes, '', 'Soups')) expect(r.tags).toContain('Soups');
+  expect(filterRecipes(recipes, '', 'Soups').length).toBeLessThan(16);
 });
 
 it('combines a tag filter with a search', () => {

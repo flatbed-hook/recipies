@@ -16,7 +16,7 @@
 <button type="button" id="clear">Clear</button>
 </div>
 <ul class="recipe-list" id="recipe-list"></ul>
-<p class="empty" id="empty" hidden>Nothing matches that. Try a different word, or clear the search.</p>
+<p class="empty" id="empty" role="status" hidden>Nothing matches that. Try a different word, or clear the search.</p>
 </main>
 <script type="module">
 import { filterRecipes } from './search.js';
@@ -27,6 +27,7 @@ const list = document.getElementById('recipe-list');
 const empty = document.getElementById('empty');
 let recipes = [];
 let activeTag = '';
+let loaded = false; // Before the fetch settles there is nothing to say; after it, always say something.
 
 const render = () => {
   const shown = filterRecipes(recipes, search.value, activeTag);
@@ -38,8 +39,12 @@ const render = () => {
     li.append(a);
     return li;
   }));
-  empty.hidden = shown.length > 0 || recipes.length === 0;
-  for (const button of tagBar.children) button.classList.toggle('active', button.textContent === activeTag);
+  empty.hidden = !loaded || shown.length > 0;
+  for (const button of tagBar.children) {
+    const on = button.dataset.tag === activeTag;
+    button.classList.toggle('active', on);
+    button.setAttribute('aria-pressed', on); // The colour alone does not reach a screen reader.
+  }
 };
 
 // 16 recipes filter in well under a frame, so this runs straight off the keystroke. No debounce.
@@ -50,18 +55,25 @@ document.getElementById('clear').onclick = () => {
   render();
 };
 
-fetch('/api/recipes').then((r) => r.json()).then((loaded) => {
-  recipes = loaded;
+fetch('/api/recipes').then((r) => r.json()).then((data) => {
+  recipes = data;
+  loaded = true;
   tagBar.append(...[...new Set(recipes.flatMap((recipe) => recipe.tags || []))].sort().map((tag) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = tag;
+    button.dataset.tag = tag; // Identity, so the label stays free to change.
     button.onclick = () => {
       activeTag = activeTag === tag ? '' : tag; // Clicking the active tag turns it off.
       render();
     };
     return button;
   }));
+  render();
+}).catch(() => {
+  // Mirrors recipe.html: a failed fetch says so rather than leaving a blank page.
+  loaded = true;
+  empty.textContent = 'The recipe list could not be loaded. Check your connection and try again.';
   render();
 });
 </script>
