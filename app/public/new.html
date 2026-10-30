@@ -10,6 +10,12 @@
 <header class="site-header"><a href="/">← All Recipes</a></header>
 <main>
 <p data-requires-noauth>Log in to add a recipe.</p>
+<form id="extract-form" class="recipe-form" data-requires-auth>
+  <label>Recipe URL <small>fetches the recipe into the form below — nothing is saved until you press Save</small>
+    <input name="url" type="url" placeholder="https://..." required></label>
+  <p class="form-error" id="extract-error" role="alert"></p>
+  <button class="fetch">Fetch recipe</button>
+</form>
 <form id="recipe-form" class="recipe-form" data-requires-auth>
   <h1>New recipe</h1>
   <label>Title <input name="title" required autofocus></label>
@@ -106,6 +112,29 @@ form.onsubmit = async (event) => {
 };
 
 fill();
+
+// Paste a URL, get the recipe in the form above to check and correct. Extraction never saves:
+// the writer still presses Save, so a bad parse cannot become a stored recipe on its own.
+const extractForm = document.getElementById('extract-form');
+const extractProblem = document.getElementById('extract-error');
+
+extractForm.onsubmit = async (event) => {
+  event.preventDefault();
+  extractProblem.textContent = '';
+  const fetchButton = extractForm.querySelector('.fetch');
+  fetchButton.disabled = true;
+
+  const response = await fetch('/api/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('recipes:token') },
+    body: JSON.stringify({ url: extractForm.elements.url.value }),
+  }).catch(() => null);
+
+  fetchButton.disabled = false;
+  const body = response ? await response.json().catch(() => ({})) : {};
+  if (response && response.ok) return (fill(body), form.elements.title.focus());
+  extractProblem.textContent = body.error || 'Could not reach that page. Check your connection and try again.';
+};
 </script>
 <script src="auth.js"></script>
 </body>

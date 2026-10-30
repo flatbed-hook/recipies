@@ -43,7 +43,7 @@ body.logged-in [data-requires-noauth] { display: none !important; }
 .recipe-form .rows { padding-left: 1.2rem; }
 .recipe-form .rows li { display: flex; gap: 0.5rem; margin-bottom: 0.4rem; }
 .recipe-form .rows button { font: inherit; flex-shrink: 0; }
-.recipe-form .save { font: inherit; }
-.recipe-form .save { padding: 0.6rem 1.2rem; }
+.recipe-form .save, .recipe-form .fetch { font: inherit; }
+.recipe-form .save, .recipe-form .fetch { padding: 0.6rem 1.2rem; }
 .recipe-form .form-error { color: #a12; font-weight: bold; }
 .recipe-form .form-error:empty { display: none; }
