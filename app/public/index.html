@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header class="site-header"><a href="/">Recipes</a> <a href="/new" data-requires-auth>+ Add recipe</a></header>
+<header class="site-header"><a href="/">Recipes</a> <a href="/new" data-requires-auth>+ Add recipe</a> <button type="button" id="backup" class="linkish" data-requires-auth>Download backup</button></header>
 <main>
 <h1>Recipes</h1>
 <div class="filters">
@@ -76,6 +76,18 @@ fetch('/api/recipes').then((r) => r.json()).then((data) => {
   empty.textContent = 'The recipe list could not be loaded. Check your connection and try again.';
   render();
 });
+
+// The backup the cutover depends on. `recipes` is already every recipe, unfiltered, so this needs
+// no endpoint — and the file is the same JSON /api/recipes serves, which is what restores it.
+// Deliberately not gated: the data is public. data-requires-auth only keeps the button out of a
+// visitor's way, and is not a security boundary.
+document.getElementById('backup').onclick = () => {
+  if (!recipes.length) return; // Nothing loaded yet; an empty file would be a worthless backup.
+  const href = URL.createObjectURL(new Blob([JSON.stringify(recipes, null, 2)], { type: 'application/json' }));
+  const link = Object.assign(document.createElement('a'), { href, download: `recipes-${new Date().toISOString().slice(0, 10)}.json` });
+  link.click();
+  URL.revokeObjectURL(href);
+};
 </script>
 <script src="auth.js"></script>
 </body>

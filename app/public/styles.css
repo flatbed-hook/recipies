@@ -48,3 +48,5 @@ body.logged-in [data-requires-noauth] { display: none !important; }
 .recipe-form .delete { font: inherit; padding: 0.6rem 1.2rem; margin-left: 0.5rem; color: #a12; }
 .recipe-form .form-error { color: #a12; font-weight: bold; }
 .recipe-form .form-error:empty { display: none; }
+
+.site-header .linkish { font: inherit; background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }

@@ -1,3 +1,9 @@
+# Old shared links were /recipes/<slug>.html on GitHub Pages. Send them to the canonical
+# extensionless URL with a real 301, so a link someone sent years ago still opens the recipe.
+# This MUST sit above the catch-all: Pages takes the first matching rule, and the rule below
+# would otherwise swallow the .html form and render the shell at the wrong URL.
+/recipes/:slug.html /recipes/:slug 301
+
 # ponytail: an unknown slug gets the not-found page at HTTP 200, since this is a
 # rewrite to a static shell. Serve the page from a Function if crawlers need a real 404.
 /recipes/* /recipe 200
